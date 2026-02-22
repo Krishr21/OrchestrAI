@@ -1,0 +1,82 @@
+services:
+  hf-ort:
+    build: ./hf-ort
+    environment:
+      HF_HOME: /data
+      ORT_MODEL_ID: distilbert/distilgpt2
+      HF_ORT_MODEL_ID: distilbert/distilgpt2
+    volumes:
+      - orchestrai_hf_cache:/data
+    ports:
+      - "8081:8080"
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: orchestrai
+      POSTGRES_PASSWORD: orchestrai
+      POSTGRES_DB: orchestrai
+    ports:
+      - "5432:5432"
+    volumes:
+      - orchestrai_pg:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://orchestrai:orchestrai@postgres:5432/orchestrai
+      REDIS_URL: redis://redis:6379/0
+      OTEL_EXPORTER_OTLP_ENDPOINT: ""
+      OTEL_SERVICE_NAME: orchestrai-backend
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: llama3.1:8b
+      HF_ORT_BASE_URL: http://hf-ort:8080
+      HF_ORT_MODEL_ID: distilbert/distilgpt2
+      OPENAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      GEMINI_API_KEY: ""
+    ports:
+      - "8000:8000"
+    depends_on:
+      - hf-ort
+      - postgres
+      - redis
+
+  worker:
+    build: ./backend
+    command: ["celery", "-A", "app.worker.celery_app", "worker", "--loglevel=INFO"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://orchestrai:orchestrai@postgres:5432/orchestrai
+      REDIS_URL: redis://redis:6379/0
+      OTEL_EXPORTER_OTLP_ENDPOINT: ""
+      OTEL_SERVICE_NAME: orchestrai-worker
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: llama3.1:8b
+      HF_ORT_BASE_URL: http://hf-ort:8080
+      HF_ORT_MODEL_ID: distilbert/distilgpt2
+      OPENAI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+      GEMINI_API_KEY: ""
+    depends_on:
+      - hf-ort
+      - postgres
+      - redis
+
+  frontend:
+    build: ./frontend
+    environment:
+      API_BASE_URL: http://backend:8000
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  orchestrai_pg:
+  orchestrai_hf_cache:
