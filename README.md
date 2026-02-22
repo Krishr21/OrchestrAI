@@ -2,6 +2,8 @@
 
 An **Agent Control Room** you can run locally for free:
 
+![OrchestrAI dashboard](assets/ui.png)
+
 - Records every agent run step-by-step (prompt, steps, tool calls, errors, latency)
 - Stores runs + steps in Postgres
 - Streams live step events via Redis Pub/Sub + WebSockets
